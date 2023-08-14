@@ -16,6 +16,9 @@ base {
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+
+jarJar.enable()
+
 minecraft {
     // The mappings can be changed at any time and must be in the following format.
     // Channel:   Version:
@@ -137,6 +140,12 @@ dependencies {
     // compileOnly fg.deobf("mezz.jei:jei-${mc_version}-forge-api:${jei_version}")
     // runtimeOnly fg.deobf("mezz.jei:jei-${mc_version}-forge:${jei_version}")
 
+    minecraftLibrary(group: 'com.zaxxer', name: 'HikariCP', version: '[5,6)')
+    minecraftLibrary(group: 'org.xerial', name: 'sqlite-jdbc', version: '[3,4)')
+
+    jarJar(group: 'com.zaxxer', name: 'HikariCP', version: '[5,6)')
+    jarJar(group: 'org.xerial', name: 'sqlite-jdbc', version: '[3,4)')
+
     // Example mod dependency using a mod jar from ./libs with a flat dir repository
     // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
     // The group id is ignored when searching -- in this case, it is "blank"
@@ -182,6 +191,10 @@ tasks.named('jar', Jar).configure {
 
     // This is the preferred method to reobfuscate your jar file
     finalizedBy 'reobfJar'
+}
+
+tasks.named('jarJar') {
+
 }
 
 // However if you are in a multi-project build, dev time needs unobfed jar files, so you can delay the obfuscation until publishing by doing:
