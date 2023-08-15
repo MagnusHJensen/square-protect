@@ -1,8 +1,12 @@
 package dk.magnusjensen.squareprotect.commands;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import dk.magnusjensen.squareprotect.SquareProtect;
 import dk.magnusjensen.squareprotect.db.Database;
-import net.minecraft.client.gui.components.ChatComponent;
+import dk.magnusjensen.squareprotect.db.lookup.BlockLookup;
+import dk.magnusjensen.squareprotect.db.lookup.SessionLookup;
+import dk.magnusjensen.squareprotect.utils.Cache;
+import dk.magnusjensen.squareprotect.utils.ChatComponent;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -17,6 +21,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 
 public class LookupSubCommands {
     public static LiteralArgumentBuilder<CommandSourceStack> build() {
@@ -25,29 +31,31 @@ public class LookupSubCommands {
     }
 
     private static int lookupEvents(CommandSourceStack source, ServerPlayer player) {
-        BlockPos pos = player.blockPosition();
-        try (Connection connection = Database.getConnection()) {
-            Statement statement = connection.createStatement();
-            int pageSize = 10;
-            int page = 1;
-            ResultSet set = statement.executeQuery("SELECT *, COUNT() OVER() as totalCount FROM block WHERE " + "x BETWEEN " + (pos.getX() - 10) + " AND " + (pos.getX() + 10) + " AND y BETWEEN " + (pos.getY() - 10) + " AND " + (pos.getY() + 10) + " AND z BETWEEN " + (pos.getZ() - 10) + " AND " + (pos.getZ() + 10) +  " ORDER BY time DESC LIMIT " + pageSize + " OFFSET " + (page - 1 * pageSize) + ";");
-            MutableComponent comp = Component.literal("Found " + set.getInt("totalCount") + " events\n");
+        try {
+            List<ChatComponent> comps = BlockLookup.lookup(Cache.DIMENSIONS.get(player.level().dimension().location()));
+            comps.addAll(SessionLookup.lookup(Cache.DIMENSIONS.get(player.level().dimension().location())));
+            Collections.sort(comps);
 
-            while (set.next()) {
-                comp.append(Component.literal(set.getString("time") + " "));
-                comp.append(Component.literal(set.getString("username") + " "));
-                comp.append(Component.literal(set.getString("action") + " "));
-                comp.append(Component.literal(set.getString("x") + " "));
-                comp.append(Component.literal(set.getString("y") + " "));
-                comp.append(Component.literal(set.getString("z") + "\n"));
+            int limit = 10;
+            int page = 0;
+            int total = comps.size();
+            int totalPages = (int) Math.ceil((float) total / limit);
+
+            MutableComponent mainComp = Component.literal("----- SquareProtect Lookup Results -----\n");
+            for (int i = page * limit; i < (page + 1) * limit; i++) {
+                if (i >= comps.size()) {
+                    break;
+                }
+                ChatComponent comp = comps.get(i);
+                mainComp.append(comp.chatComponent());
             }
-            comp.append(Component.literal("<< " + page + " of " + (set.getInt("totalCount") / pageSize + 1) + " >>"));
-            source.sendSuccess(() -> comp, false);
-            set.close();
-            statement.close();
+
+            mainComp.append("Page " + (page + 1) + "/" + totalPages);
+            source.sendSuccess(() -> mainComp, false);
+            return 0;
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            SquareProtect.LOGGER.error("Failed to lookup events", e);
+            return -1;
         }
-        return 0;
     }
 }
